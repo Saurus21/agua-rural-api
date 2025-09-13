@@ -78,3 +78,24 @@ CREATE INDEX IF NOT EXISTS idx_lecturas_fecha ON Lecturas(fecha);
 CREATE INDEX IF NOT EXISTS idx_lecturas_sincronizado ON Lecturas(sincronizado);
 CREATE INDEX IF NOT EXISTS idx_alertas_lectura_id ON Alertas(lectura_id);
 CREATE INDEX IF NOT EXISTS idx_medidores_serial ON Medidores(serial);
+
+-- Insertar datos iniciales después de crear las tablas
+
+-- Insertar zona rural de ejemplo
+INSERT INTO ZonasRurales (nombre_zona, comuna, region) VALUES
+('Valle Central', 'Pirque', 'Metropolitana'),
+('Zona Sur', 'Paine', 'Metropolitana')
+ON CONFLICT DO NOTHING;
+
+-- Insertar usuario administrador (password: admin123)
+INSERT INTO Usuarios (nombre, email, telefono, password_hash, rol, zona_id) VALUES
+('Administrador', 'admin@ruraldata.cl', '+56912345678', '$2a$12$L6hBpPJ1VUz1UZz1UZz1UO1UZz1UZz1UZz1UZz1UZz1UZz1UZz1UZ', 'admin', 1),
+('Lector Ejemplo', 'lector@ruraldata.cl', '+56987654321', '$2a$12$L6hBpPJ1VUz1UZz1UZz1UO1UZz1UZz1UZz1UZz1UZz1UZz1UZz1UZ', 'lector', 2)
+ON CONFLICT DO NOTHING;
+
+-- Insertar medidores de ejemplo
+INSERT INTO Medidores (serial, ubicacion, user_id) VALUES
+('MED-001', 'Casa principal, Valle Central', 2),
+('MED-002', 'Poste de luz, Zona Sur', 2),
+('MED-003', 'Estación de bombeo', 2)
+ON CONFLICT DO NOTHING;
