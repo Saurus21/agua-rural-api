@@ -1,6 +1,8 @@
 const db = require('../config/database');
 const { generateToken } = require('../utils/jwt');
 const { comparePassword } = require('../utils/password');
+const { hashPassword } = require('../utils/password');
+const { validationResult } = require('express-validator');
 
 const login = async (req, res) => {
   const { email, password } = req.body;
@@ -78,6 +80,12 @@ const verify = async (req, res) => {
 };
 
 const changePassword = async (req, res) => {
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
   const { currentPassword, newPassword } = req.body;
   const userId = req.user.userId;
 
@@ -98,7 +106,6 @@ const changePassword = async (req, res) => {
     }
 
     // hashear nuevo password
-    const { hashPassword } = require('../utils/password');
     const newPasswordHash = await hashPassword(newPassword);
 
     // actualizar password

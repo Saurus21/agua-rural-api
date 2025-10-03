@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -18,6 +19,8 @@ const { testConnection } = require('./config/database');
 const { authenticateToken } = require('./middleware/auth');
 app.use('/api/lecturas', lecturasRouter);
 app.use('/api/auth', authRoutes);
+
+// rutas de api primero
 
 // rutas de health check
 app.get('/api/health', (req, res) => {
@@ -43,12 +46,28 @@ app.get('/api/health/db', async (req, res) => {
     }
 });
 
-app.get('/api/prrotected', authenticateToken, (req, res) => {
+app.get('/api/protected', authenticateToken, (req, res) => {
     res.json({
       message: 'Acceso concedido a ruta protegida',
       user: req.user
     });
 });
+
+
+// servir archivos estáticos (si es necesario)
+app.use(express.static(path.join(__dirname, '../public')));
+
+// ruta para servir formulario de login
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, '../public/login.html'));
+});
+
+// ruta para dashboard (después de login)
+app.get('/dashboard', (req, res) => {
+    res.sendFile(path.join(__dirname, '../public/dashboard.html'));
+});
+
+
 
 // manejo de rutas no encontradas
 app.use('/*path', (req, res) => {
@@ -68,6 +87,7 @@ app.use((err, req, res, next) => {
 if (process.env.NODE_ENV !== 'test') {
   app.listen(port, async () => {
     console.log(`Servidor escuchando en el puerto ${port}`);
+    console.log(`Archivos estáticos en: ${path.join(__dirname, '../public')}`);
     console.log(`Entorno: ${process.env.NODE_ENV}`);
 
     // probar la conexion a la base de datos al iniciar el servidor

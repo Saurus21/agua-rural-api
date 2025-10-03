@@ -53,4 +53,27 @@ describe('Auth Endpoints', () => {
     expect(verifyRes.statusCode).toEqual(200);
     expect(verifyRes.body).toHaveProperty('valid', true);
   });
+
+  it('debería fallar el login si el usuario está inactivo', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({
+        email: 'inactivo@test.com',
+        password: 'password123'
+      });
+    
+    expect(res.statusCode).toEqual(401);
+    expect(res.body).toHaveProperty('error', 'Usuario inactivo');
+  });
+
+  it('debería rechazar la verificación con un token inválido', async () => {
+    const invalidtoken = 'un.token.falso';
+    const res = await request(app)
+      .get('/api/auth/verify')
+      .set('Authorization', `Bearer ${invalidtoken}`); 
+
+    expect(res.statusCode).toEqual(403);
+    expect(res.body.error).toMatch(/Token inválido o expirado/);
+  });
+
 });

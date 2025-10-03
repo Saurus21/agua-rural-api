@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Rural Data</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .dashboard-container {
+            max-width: 800px;
+        }
+        
+        .dashboard-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        .user-info {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .action-btn {
+            padding: 15px;
+            background: white;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            color: #3498db;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .action-btn:hover {
+            background: #3498db;
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .logout-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        
+        .logout-btn:hover {
+            background: #c0392b;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container dashboard-container">
+        <div class="login-card">
+            <div class="dashboard-header" style="justify-content: space-between;">
+                <div class="logo">
+                    <h1>Dashboard</h1>
+                    <p>Panel de Control - Rural Data</p>
+                </div>
+                <button class="logout-btn" onclick="logout()" style="margin-left: auto;">Cerrar Sesión</button>
+            </div>
+            
+            <div class="user-info">
+                <h3>Información del Usuario</h3>
+                <div id="userDetails">Cargando...</div>
+            </div>
+            
+            <div class="actions">
+                <button class="action-btn" onclick="navigateTo('lecturas')">
+                    Ver Lecturas
+                </button>
+                <button class="action-btn" onclick="navigateTo('medidores')">
+                    Gestionar Medidores
+                </button>
+                <button class="action-btn" onclick="navigateTo('reportes')">
+                    Generar Reportes
+                </button>
+                <button class="action-btn" onclick="navigateTo('alertas')">
+                    Ver Alertas
+                </button>
+            </div>
+            
+            <div id="apiResponse" class="message hidden" style="margin-top: 20px;"></div>
+        </div>
+    </div>
+
+    <script>
+        class Dashboard {
+            constructor() {
+                this.apiBaseUrl = window.location.origin + '/api';
+                this.init();
+            }
+
+            init() {
+                this.checkAuthentication();
+                this.loadUserData();
+                this.testProtectedEndpoint();
+            }
+
+            checkAuthentication() {
+                const token = localStorage.getItem('authToken');
+                if (!token) {
+                    window.location.href = '/login';
+                    return;
+                }
+            }
+
+            loadUserData() {
+                const userData = localStorage.getItem('userData');
+                if (userData) {
+                    const user = JSON.parse(userData);
+                    document.getElementById('userDetails').innerHTML = `
+                        <p><strong>Nombre:</strong> ${user.nombre}</p>
+                        <p><strong>Email:</strong> ${user.email}</p>
+                        <p><strong>Rol:</strong> ${user.rol}</p>
+                        <p><strong>ID:</strong> ${user.id}</p>
+                    `;
+                }
+            }
+
+            async testProtectedEndpoint() {
+                try {
+                    const token = localStorage.getItem('authToken');
+                    const response = await fetch(`${this.apiBaseUrl}/protected`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        this.showMessage('✅ Conexión con API protegida exitosa', 'success');
+                    } else {
+                        this.showMessage('❌ Error en conexión protegida: ' + data.error, 'error');
+                    }
+                } catch (error) {
+                    this.showMessage('❌ Error de conexión: ' + error.message, 'error');
+                }
+            }
+
+            showMessage(message, type = 'info') {
+                const messageDiv = document.getElementById('apiResponse');
+                messageDiv.textContent = message;
+                messageDiv.className = `message ${type}`;
+                messageDiv.classList.remove('hidden');
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userData');
+            window.location.href = '/login';
+        }
+
+        function navigateTo(section) {
+            alert(`Navegando a: ${section}\n\nEsta funcionalidad se implementará próximamente.`);
+        }
+
+        // Inicializar dashboard
+        document.addEventListener('DOMContentLoaded', () => {
+            new Dashboard();
+        });
+    </script>
+</body>
+</html>
