@@ -4,6 +4,8 @@ const { comparePassword } = require('../utils/password');
 const { hashPassword } = require('../utils/password');
 const { validationResult } = require('express-validator');
 
+const { User } = require('../models');
+
 const login = async (req, res) => {
   const { email, password } = req.body;
 
@@ -14,25 +16,21 @@ const login = async (req, res) => {
     }
 
     // buscar usuario por email
-    const userResult = await db.query(
-      'SELECT user_id, nombre, email, password_hash, rol, activo FROM Usuarios WHERE email = $1',
-      [email.toLowerCase().trim()]
-    );
+    const user = await User.findByEmail(email);
 
-    if (userResult.rows.length === 0) {
+    // si no existe usuario
+    if (!user) {
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
-
-    const user = userResult.rows[0];
 
     // verificar si el usuario esta activo
     if (!user.activo) {
       return res.status(401).json({ error: 'Usuario inactivo' });
     }
 
-    // verificar password
-    const isPasswordValid = await comparePassword(password, user.password_hash);
-    
+    // verificar password ahora ocupando el modelo
+    const isPasswordValid = await User.verifyPassword(password, user.password_hash);
+
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
@@ -40,11 +38,8 @@ const login = async (req, res) => {
     // generar token JWT
     const token = generateToken(user.user_id, user.email, user.rol);
 
-    // registrar login exitoso (opcional)
-    await db.query(
-      'UPDATE Usuarios SET ultimo_login = CURRENT_TIMESTAMP WHERE user_id = $1',
-      [user.user_id]
-    );
+    // registrar login exitoso (con modelo)
+    await User.updateLastLogin(user.user_id);
 
     // devolver respuesta exitosa
     res.json({

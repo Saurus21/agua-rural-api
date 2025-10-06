@@ -2,10 +2,34 @@ const request = require('supertest');
 const app = require('../app');
 const db = require('../config/database');
 
+const { User } = require('../models');
+
 describe('Auth Endpoints', () => {
+  let testUserId;
+
   beforeAll(async () => {
-    // esperar a que la base de datos este conectada
-    await db.testConnection();
+    // primero verificar si el usuario inactivo ya existe y eliminarlo
+    const existingUsers = await User.findAll({ email: 'inactivo@test.com' });
+    for (const user of existingUsers) {
+      await User.delete(user.user_id);
+    }
+    // despues, crear un usuario inactivo para las pruebas
+    const userInactivo = await User.create({
+      nombre: 'Usuario Inactivo Test',
+      email: 'inactivo@test.com',
+      password: 'test123',
+      rol: 'lector',
+      activo: false,
+      zona_id: 1
+    });
+    testUserId = userInactivo.user_id;
+  });
+
+  afterAll(async () => {
+    // limpiar el usuario de prueba
+    if (testUserId) {
+      await User.delete(testUserId);
+    }
   });
 
   it('debería fallar login con credenciales inválidas', async () => {
@@ -55,11 +79,17 @@ describe('Auth Endpoints', () => {
   });
 
   it('debería fallar el login si el usuario está inactivo', async () => {
+    // solo ejecutar esta prueba si tenemos un usuario inactivo
+    if (!testUserId) {
+      console.log('⚠️  Saltando prueba de usuario inactivo - no se pudo crear usuario de prueba');
+      return;
+    }
+
     const res = await request(app)
       .post('/api/auth/login')
       .send({
         email: 'inactivo@test.com',
-        password: 'password123'
+        password: 'test123'
       });
     
     expect(res.statusCode).toEqual(401);

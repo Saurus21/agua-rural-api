@@ -8,6 +8,7 @@
     "dev": "nodemon api/src/app.js",
     "test": "jest",
     "test-watch": "jest --watch",
+    "test-clean": "node scripts/cleanupTestData.js",
     "dev:full": "concurrently \"npm run dev\" \"live-server ../public --port=3002\""
   },
   "keywords": [],
