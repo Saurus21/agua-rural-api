@@ -80,10 +80,23 @@
                 <h3>Información del Usuario</h3>
                 <div id="userDetails">Cargando...</div>
             </div>
+
+            <div class="dashboard-section">
+                <h3>Estadísticas Generales</h3>
+                <div id="statsContainer">Cargando estadísticas...</div>
+            </div>
+
+            <div class="dashboard-section">
+                <div id="recentLecturas">Cargando lecturas recientes...</div>
+            </div>
+
+            <div class="dashboard-section">
+                <div id="pendingAlertas">Cargando alertas pendientes...</div>
+            </div>
             
             <div class="actions">
                 <button class="action-btn" onclick="navigateTo('lecturas')">
-                    Ver Lecturas
+                    Ver Todas las Lecturas
                 </button>
                 <button class="action-btn" onclick="navigateTo('medidores')">
                     Gestionar Medidores
@@ -92,11 +105,16 @@
                     Generar Reportes
                 </button>
                 <button class="action-btn" onclick="navigateTo('alertas')">
-                    Ver Alertas
+                    Ver Todas las Alertas
                 </button>
             </div>
             
             <div id="apiResponse" class="message hidden" style="margin-top: 20px;"></div>
+
+            <div class="debug-info">
+                <strong>Debug Info:</strong>
+                <div id="debugInfo">Cargando...</div>
+            </div>
         </div>
     </div>
 
@@ -104,6 +122,7 @@
         class Dashboard {
             constructor() {
                 this.apiBaseUrl = window.location.origin + '/api';
+                this.token = localStorage.getItem('authToken');
                 this.init();
             }
 
@@ -111,13 +130,193 @@
                 this.checkAuthentication();
                 this.loadUserData();
                 this.testProtectedEndpoint();
+                this.loadDashboardData();
+                this.updateDebugInfo();
             }
 
             checkAuthentication() {
-                const token = localStorage.getItem('authToken');
-                if (!token) {
-                    window.location.href = '/login';
+                if (!this.token) {
+                    this.showMessage('No hay token de autenticación. Redirigiendo al login...', 'error');
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
                     return;
+                }
+                console.log('Token encontrado en localStorage');
+            }
+
+            // metodo para hacer requests autenticadas
+            async authenticatedFetch(url, options = {}) {
+                try {
+                    console.log(`🔐 Haciendo request autenticada a: ${url}`);
+                    
+                    const headers = {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.token}`,
+                        ...options.headers
+                    };
+
+                    const response = await fetch(url, {
+                        ...options,
+                        headers: headers
+                    });
+
+                    console.log(`📡 Response status: ${response.status}`);
+                    
+                    // si el token expira, redirigir al login
+                    if (response.status === 403 || response.status === 401) {
+                        this.handleTokenExpired();
+                        return null;
+                    }
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('Error en response:', errorText);
+                        throw new Error(`HTTP ${response.status}: ${errorText}`);
+                    }
+                    
+                    return response;
+                } catch (error) {
+                    console.error('Error en authenticatedFetch:', error);
+                    this.showMessage('Error de conexión: ' + error.message, 'error');
+                    throw error;
+                }
+            }
+
+            handleTokenExpired() {
+                this.showMessage('Tu sesión ha expirado. Redirigiendo al login...', 'error');
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('userData');
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 2000);
+            }
+
+            async loadDashboardData() {
+                try {
+                    console.log('Cargando datos del dashboard...');
+
+                    // cargar estadisticas
+                    const statsResponse = await this.authenticatedFetch(`${this.apiBaseUrl}/dashboard/estadisticas`);
+                    if (statsResponse) {
+                        const statsData = await statsResponse.json();
+                        console.log('Estadisticas cargadas:', statsData);
+                        this.displayStats(statsData);
+                    }
+
+                    // cargar lecturas recientes
+                    const lecturasResponse = await this.authenticatedFetch(`${this.apiBaseUrl}/lecturas?limit=5`);
+                    if (lecturasResponse) {
+                        const lecturasData = await lecturasResponse.json();
+                        console.log('Lecturas cargadas:', lecturasData);
+                        this.displayRecentLecturas(lecturasData.lecturas);
+                    }
+
+                    // cargar alertas pendientes
+                    const alertasResponse = await this.authenticatedFetch(`${this.apiBaseUrl}/alertas/pendientes`);
+                    if (alertasResponse) {
+                        const alertaData = await alertasResponse.json();
+                        console.log('Alertas cargadas:', alertaData);
+                        this.displayPendingAlertas(alertaData.alertas);
+                    }
+
+                } catch (error) {
+                    console.error('Error cargando datos del dashboard:', error);
+                    this.showMessage('Error cargando datos del dashboard: ' + error.message, 'error');
+                }
+            }
+
+            displayStats(statsData) {
+                const statsContainer = document.getElementById('statsContainer');
+                if (!statsContainer) return;
+
+                const { general } = statsData;
+
+                statsContainer.innerHTML = `
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3>Medidores</h3>
+                            <div class="stat-value">${general.total_medidores || 0}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Lecturas (${statsData.periodo_dias}d)</h3>
+                            <div class="stat-value">${general.total_lecturas || 0}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Consumo Total</h3>
+                            <div class="stat-value">${general.consumo_total || 0}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Alertas Pendientes</h3>
+                            <div class="stat-value">${general.alertas_pendientes || 0}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            displayRecentLecturas(lecturas){
+                const lecturasContainer = document.getElementById('recentLecturas');
+                if (!lecturasContainer) return;
+
+                if (!lecturas || lecturas.length === 0) {
+                    lecturasContainer.innerHTML = '<p>No hay lecturas recientes</p>';
+                    return;
+                }
+
+                lecturasContainer.innerHTML = `
+                    <h3>Lecturas Recientes</h3>
+                    <div class="lecturas-list">
+                        ${lecturas.map(lectura => `
+                            <div class="lectura-item">
+                                <strong>${lectura.medidor_serial}</strong>:
+                                ${lectura.valor} -
+                                ${new Date(lectura.fecha).toLocaleDateString()}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            displayPendingAlertas(alertas) {
+                const alertasContainer = document.getElementById('pendingAlertas');
+                if (!alertasContainer) return;
+
+                if (!alertas || alertas.length === 0) {
+                    alertasContainer.innerHTML = '<p>No hay alertas pendientes</p>';
+                    return;
+                }
+
+                alertasContainer.innerHTML = `
+                    <h3>Alertas Pendientes</h3>
+                    <div class="alertas-list">
+                        ${alertas.map(alerta => `
+                            <div class="alerta-item ${alerta.tipo}">
+                                <strong>${alerta.medidor_serial}</strong>:
+                                ${alerta.mensaje}
+                                <button onClick="resolverAlerta(${alerta.alerta_id})" class = "btn-resolver">
+                                    Resolver
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
+            async testProtectedEndpoint() {
+                try {
+                    console.log('Probando endpoint protegido...');
+
+                    const response = await this.authenticatedFetch(`${this.apiBaseUrl}/protected`);
+
+                    if (response && response.ok) {
+                        const data = await response.json();
+                        this.showMessage('Conexión con API protegida exitosa', 'success');
+                        console.log('Datos recibidos:', data);
+                    } else {
+                        this.showMessage('Error en conexión protegida', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error completo:', error);
                 }
             }
 
@@ -131,28 +330,24 @@
                         <p><strong>Rol:</strong> ${user.rol}</p>
                         <p><strong>ID:</strong> ${user.id}</p>
                     `;
+                } else {
+                    document.getElementById('userDetails').innerHTML = '<p>No se encontraron datos del usuario</p>';
                 }
             }
 
-            async testProtectedEndpoint() {
-                try {
-                    const token = localStorage.getItem('authToken');
-                    const response = await fetch(`${this.apiBaseUrl}/protected`, {
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
-                    });
+            updateDebugInfo() {
+                const userData = localStorage.getItem('userData');
+                const user = userData ? JSON.parse(userData) : null;
 
-                    const data = await response.json();
-                    
-                    if (response.ok) {
-                        this.showMessage('✅ Conexión con API protegida exitosa', 'success');
-                    } else {
-                        this.showMessage('❌ Error en conexión protegida: ' + data.error, 'error');
-                    }
-                } catch (error) {
-                    this.showMessage('❌ Error de conexión: ' + error.message, 'error');
-                }
+                const debugInfo = `
+                    URL Base: ${this.apiBaseUrl}
+                    Token: ${this.token ? 'PRESENTE': 'AUSENTE'}
+                    User: ${user ? user.nombre : 'NO CARGADO'}
+                    Rol: ${user ? user.rol : 'NO CARGADO'}
+                    Timestamp: ${new Date().toISOString()}
+                `;
+
+                document.getElementById('debugInfo').innerText = debugInfo;
             }
 
             showMessage(message, type = 'info') {
@@ -160,6 +355,32 @@
                 messageDiv.textContent = message;
                 messageDiv.className = `message ${type}`;
                 messageDiv.classList.remove('hidden');
+                this.updateDebugInfo();
+            }
+        }
+
+        // funcion global para resolver alertas
+        async function resolverAlerta(alertaId) {
+            try {
+                const token = localStorage.getItem('authToken');
+                const response = await fetch(`${window.location.origin}/api/alertas/${alertaId}/resolver`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    alert('Alerta resuelta exitosamente');
+                    // recargar el dashboard
+                    window.location.reload();
+                } else {
+                    alert('Error resolviendo la alerta');
+                }
+            } catch (error) {
+                console.error('Error resolviendo alerta:', error);
+                alert('Error de conexión');
             }
         }
 

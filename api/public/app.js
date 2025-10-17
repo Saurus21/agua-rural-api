@@ -1,6 +1,7 @@
 class AuthApp {
     constructor() {
         this.apiBaseUrl = window.location.origin + '/api';
+        this.token = localStorage.getItem('authToken');
         this.init();
     }
 
@@ -14,6 +15,57 @@ class AuthApp {
         
         // verificar si ya hay un token almacenado
         this.checkExistingToken();
+    }
+
+    // meotodo para requests autenticadas
+    async authenticatedFetch(url, options = {}) {
+        const token = this.token || localStorage.getItem('authToken');
+
+        const defaultOptions = {
+            headers: {
+                'Content Type': 'application-json',
+                ...options.headers
+            }
+        };
+
+        // agregar token
+        if (token) {
+            defaultOptions.headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const finalOptions = {
+            ...defaultOptions,
+            ...options,
+            headers: {
+                ...defaultOptions.headers,
+                ...options.headers
+            }
+        };
+
+        try {
+            const response = await fetch(url, finalOptions);
+
+            // si el token expira, redirigir al login
+            if (response.status === 403 || response.status === 401) {
+                this.handleTokenExpired();
+                return null;
+            }
+
+            return response;
+
+        } catch (error) {
+            console.error('Error en request:', error);
+            throw error;
+        }
+    }
+
+    handleTokenExpired() {
+        this.showMessage('Tu sesión ha expirado. Redirigiendo al login...', 'error');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userData');
+        setTimeout(() => {
+            window.location.href = '/login';
+        }, 2000);
     }
 
     checkExistingToken() {
@@ -89,10 +141,10 @@ class AuthApp {
         
         this.showMessage('¡Login exitoso! Redirigiendo...', 'success');
         
-        // redirigir al dashboard después de 2 segundos
+        // redirigir al dashboard después de 1 segundo
         setTimeout(() => {
             window.location.href = '/dashboard';
-        }, 2000);
+        }, 1000);
     }
 
     handleLoginError(errorMessage) {
