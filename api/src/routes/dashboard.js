@@ -7,5 +7,6 @@ router.use(authenticateToken);
 
 router.get('/estadisticas', dashboardController.getEstadisticas);
 router.get('/consumo-por-zona', dashboardController.getConsumoPorZona);
+router.get('/resumen', dashboardController.getResumen);
 
 module.exports = router;

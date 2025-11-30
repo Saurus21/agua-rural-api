@@ -8,7 +8,8 @@ const lecturaController = require('../controllers/lecturaController');
 router.use(authenticateToken);
 
 router.get('/', lecturaController.getLecturas);
-router.post('/', lecturaController.createLectura);
+router.get('/:id', lecturaController.getLecturaById);
+router.post('/', lecturaController.createLectura.bind(lecturaController));
 router.post('/sincronizar', lecturaController.sincronizarLecturas);
 
 module.exports = router;

@@ -35,15 +35,15 @@ class ZonaRural extends BaseModel {
                 z.comuna,
                 z.region,
                 COUNT(l.lectura_id) as total_lecturas,
-                AVG(l.valor) as consumo_promedio,
-                SUM(l.valor) as consumo_total,
+                ROUND(AVG(l.valor):: numeric, 2) as consumo_promedio,
+                ROUND(SUM(l.valor):: numeric, 2) as consumo_total,
             FROM zonasrurales z
             LEFT JOIN usuarios u ON z.zona_id = u.zona_id
             LEFT JOIN medidores m ON u.user_id = m.user_id
             LEFT JOIN lecturas l ON m.medidor_id = l.medidor_id
-            WHERE l.fecha BETWEEN $1 AND $2
+                WHERE l.fecha BETWEEN $1 AND $2
             GROUP BY z.zona_id, z.nombre_zona, z.comuna, z.region
-            ORDER BY consumo_total DESC
+            ORDER BY consumo_total DESC NULLS LAST
         `;
         const result = await this.query(sql, [startDate, endDate]);
         return result.rows;

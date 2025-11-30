@@ -78,7 +78,26 @@ app.get('/dashboard', (req, res) => {
     res.sendFile(path.join(__dirname, '../public/dashboard.html'));
 });
 
+// nueva ruta para lecturas (dentro de dashboard)
+app.get('/lecturas', (req, res) => {
+    res.sendFile(path.join(__dirname, '../public/lecturas.html'));
+});
 
+// aca tambien se agregan los otros al momento de crearse
+// nueva ruta para medidores
+app.get('/medidores', (req, res) => {
+    res.sendFile(path.join(__dirname, '../public/medidores.html'));
+});
+
+// ruta de reportes
+app.get('/reportes', (req, res) => {
+    res.sendFile(path.join(__dirname, '../public/reportes.html'));
+});
+
+// ruta de alertas
+app.get('/alertas', (req, res) => {
+    res.sendFile(path.join(__dirname, '../public/alertas.html'));
+});
 
 // manejo de rutas no encontradas
 app.use('/*path', (req, res) => {

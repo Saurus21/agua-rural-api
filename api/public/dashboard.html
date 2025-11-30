@@ -82,6 +82,11 @@
             </div>
 
             <div class="dashboard-section">
+                <h3>Resumen Rápido</h3>
+                <div id="resumenContainer">Cargando resumen...</div>
+            </div>
+
+            <div class="dashboard-section">
                 <h3>Estadísticas Generales</h3>
                 <div id="statsContainer">Cargando estadísticas...</div>
             </div>
@@ -148,7 +153,7 @@
             // metodo para hacer requests autenticadas
             async authenticatedFetch(url, options = {}) {
                 try {
-                    console.log(`🔐 Haciendo request autenticada a: ${url}`);
+                    console.log(`Haciendo request autenticada a: ${url}`);
                     
                     const headers = {
                         'Content-Type': 'application/json',
@@ -161,7 +166,7 @@
                         headers: headers
                     });
 
-                    console.log(`📡 Response status: ${response.status}`);
+                    console.log(`Response status: ${response.status}`);
                     
                     // si el token expira, redirigir al login
                     if (response.status === 403 || response.status === 401) {
@@ -196,34 +201,56 @@
                 try {
                     console.log('Cargando datos del dashboard...');
 
+                    // resumen rápido
+                    const resumenResponse = await this.authenticatedFetch(`${this.apiBaseUrl}/dashboard/resumen`);
+                    if (resumenResponse && resumenResponse.ok) {
+                        const resumenData = await resumenResponse.json();
+                        this.displayResumen(resumenData);
+                    }
+
                     // cargar estadisticas
                     const statsResponse = await this.authenticatedFetch(`${this.apiBaseUrl}/dashboard/estadisticas`);
-                    if (statsResponse) {
+                    if (statsResponse && statsResponse.ok) {
                         const statsData = await statsResponse.json();
-                        console.log('Estadisticas cargadas:', statsData);
+                        
                         this.displayStats(statsData);
-                    }
 
-                    // cargar lecturas recientes
-                    const lecturasResponse = await this.authenticatedFetch(`${this.apiBaseUrl}/lecturas?limit=5`);
-                    if (lecturasResponse) {
-                        const lecturasData = await lecturasResponse.json();
-                        console.log('Lecturas cargadas:', lecturasData);
-                        this.displayRecentLecturas(lecturasData.lecturas);
-                    }
-
-                    // cargar alertas pendientes
-                    const alertasResponse = await this.authenticatedFetch(`${this.apiBaseUrl}/alertas/pendientes`);
-                    if (alertasResponse) {
-                        const alertaData = await alertasResponse.json();
-                        console.log('Alertas cargadas:', alertaData);
-                        this.displayPendingAlertas(alertaData.alertas);
+                        // lecturas recientes
+                        this.displayRecentLecturas(statsData.lecturas_recientes);
+                        // alertas pendientes
+                        this.displayPendingAlertas(statsData.alertas_recientes);
                     }
 
                 } catch (error) {
                     console.error('Error cargando datos del dashboard:', error);
                     this.showMessage('Error cargando datos del dashboard: ' + error.message, 'error');
                 }
+            }
+
+            displayResumen(resumenData) {
+                const resumenContainer = document.getElementById('resumenContainer');
+                if (!resumenContainer) return;
+
+                resumenContainer.innerHTML = `
+                    <div class="resumen-grid">
+                        <div class="resumen-card">
+                            <h4>Medidores Activos</h4>
+                            <div class="resumen-value">${resumenData.total_medidores || 0}</div>
+                        </div>
+                        <div class="resumen-card">
+                            <h4>Lecturas Hoy</h4>
+                            <div class="resumen-value">${resumenData.lecturas_hoy || 0}</div>
+                        </div>
+                        <div class="resumen-card">
+                            <h4>Consumo Hoy</h4>
+                            <div class="resumen-value">${resumenData.consumo_hoy || 0}</div>
+                        </div>
+                        <div class="resumen-card">
+                            <h4>Alertas Hoy</h4>
+                            <div class="resumen-value">${resumenData.alertas_hoy || 0}</div>
+                        </div>
+                    </div>
+                `;
             }
 
             displayStats(statsData) {
@@ -390,8 +417,24 @@
             window.location.href = '/login';
         }
 
+        // funcion actualizada
         function navigateTo(section) {
-            alert(`Navegando a: ${section}\n\nEsta funcionalidad se implementará próximamente.`);
+            switch(section) {
+                case 'lecturas':
+                    window.location.href = '/lecturas.html';
+                    break;
+                case 'medidores':
+                    window.location.href = '/medidores.html';
+                    break;
+                case 'reportes':
+                    window.location.href = '/reportes.html';
+                    break;
+                case 'alertas':
+                    window.location.href = '/alertas.html';
+                    break;
+                default:
+                    alert(`Navegando a: ${section}`);
+            }
         }
 
         // Inicializar dashboard

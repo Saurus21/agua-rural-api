@@ -38,7 +38,7 @@ class BaseModel {
         }
     }
 
-    // convertir campos NUMERIC a Number
+    // convertir campos NUMERIC de string a Number
     convertNumericFields(rows) {
         return rows.map(row => {
             const convertedRow = { ...row };
@@ -65,8 +65,15 @@ class BaseModel {
             const conditionsArray = [];
             for (const [key, value] of Object.entries(conditions)) {
                 paramCount++;
-                conditionsArray.push(`${key} = $${paramCount}`);
-                values.push(value);
+                // DETECCIÓN DE OPERADORES (como $like)
+                if (typeof value === 'object' && value !== null && value.$like) {
+                    conditionsArray.push(`${key} LIKE $${paramCount}`);
+                    values.push(value.$like);
+                } else {
+                    // Comportamiento normal (IGUALDAD)
+                    conditionsArray.push(`${key} = $${paramCount}`);
+                    values.push(value);
+                }
             }
             whereClause = `WHERE ${conditionsArray.join(' AND ')}`;
         }
@@ -93,7 +100,7 @@ class BaseModel {
     // método para encontrar un registro por su ID
 
     async findById(id) {
-        const sql = `SELECT * FROM ${this.tableName} WHERE ${this.tableName.slice(0, -1)}_id = $1`;
+        const sql = `SELECT * FROM ${this.tableName} WHERE ${this.idColumn} = $1`;
         const result = await this.query(sql, [id]);
         return result.rows[0] || null;
     }
@@ -120,11 +127,17 @@ class BaseModel {
     async update(id, data) {
         const keys = Object.keys(data);
         const values = Object.values(data);
-        const setClause = keys.map((key, index) => `${key} = $${index + 1}`).join(', ');
+        const setFragments = keys.map((key, index) => `${key} = $${index + 1}`);
 
+        let setClause = setFragments.join(', ');
+
+        if (setClause.length > 0) {
+            setClause += ', ';
+        }
+        
         const sql = `
             UPDATE ${this.tableName} 
-            SET ${setClause}, updated_at = CURRENT_TIMESTAMP 
+            SET ${setClause} updated_at = CURRENT_TIMESTAMP 
             WHERE ${this.idColumn} = $${keys.length + 1} 
             RETURNING *
         `;

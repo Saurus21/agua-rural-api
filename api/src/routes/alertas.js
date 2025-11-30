@@ -8,6 +8,7 @@ router.use(authenticateToken);
 router.get('/', alertaController.getAlertas);
 router.get('/estadisticas', alertaController.getEstadisticasAlertas);
 router.get('/pendientes', alertaController.getAlertasPendientes);
+router.get('/:id', alertaController.getAlertaById);
 router.put('/:id/resolver', alertaController.resolverAlerta);
 router.post('/', requireRole(['admin']), alertaController.crearAlerta);
 

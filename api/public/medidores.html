@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medidores - Rural Data</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .filters {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .data-table {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15 px rgba(0,0,0,0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        th {
+            background: #34495e;
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #ecf0f1;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 2px;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+        
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #219a52;
+        }
+        
+        .btn-warning {
+            background: #f39c12;
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            background: #e67e22;
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+        
+        .badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge-activo {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-inactivo {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card-small {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+        
+        .stat-value-small {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .stat-label-small {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0; top: 0;
+            width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            overflow: auto;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 25px;
+            border: 1px solid #888;
+            width: 90%; max-width: 600px;
+            border-radius: 10px;
+            position: relative;
+        }
+
+        .close-modal {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close-modal:hover { color: black; }
+        .form-group { margin-bottom: 15px; }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .modal-footer {
+            text-align: right;
+            margin-top: 20px;
+        }
+        
+        /* estilos tabla interna del modal */
+        .mini-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        .mini-table th, .mini-table td {
+            border-bottom: 1px solid #eee;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .mini-table th {
+            background-color: #f8f9fa;
+            color: #333;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="login-container" style="max-width: 1400px;">
+        <div class="login-card">
+            <div class="page-header">
+                <div>
+                    <h1>Gestión de Medidores</h1>
+                    <p>Administra todos los medidores del sistema</p>
+                </div>
+                <div>
+                    <button class="btn btn-secondary" onclick="goBack()">Volver al Dashboard</button>
+                    <button class="btn btn-success" onclick="showNuevoMedidor()">Nuevo Medidor</button>
+                </div>
+            </div>
+            
+            <div class="message hidden">
+                <div id="apiResponse"></div>
+            </div>
+
+            <!-- estadísticas rápidas -->
+            <div class="stats-cards">
+                <div class="stat-card-small">
+                    <div class="stat-value-small" id="totalMedidores">0</div>
+                    <div class="stat-label-small">Total Medidores</div>
+                </div>
+                <div class="stat-card-small">
+                    <div class="stat-value-small" id="medidoresActivos">0</div>
+                    <div class="stat-label-small">Activos</div>
+                </div>
+                <div class="stat-card-small">
+                    <div class="stat-value-small" id="medidoresInactivos">0</div>
+                    <div class="stat-label-small">Inactivos</div>
+                </div>
+                <div class="stat-card-small">
+                    <div class="stat-value-small" id="ultimaLectura">0</div>
+                    <div class="stat-label-small">Última Lectura</div>
+                </div>
+            </div>
+
+            <!-- filtros -->
+            <div class="filters">
+                <h3>Filtros de Búsqueda</h3>
+                <div class="filter-grid">
+                    <div>
+                        <label for="filterUsuario">Usuario:</label>
+                        <select id="filterUsuario" onchange="aplicarFiltrosMedidores()">
+                            <option value="">Todos los usuarios</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="filterEstado">Estado:</label>
+                        <select id="filterEstado" onchange="aplicarFiltrosMedidores()">
+                            <option value="">Todos</option>
+                            <option value="true">Activo</option>
+                            <option value="false">Inactivo</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="filterSerial">Serial:</label>
+                        <input type="text" id="filterSerial" placeholder="Buscar por serial..." oninput="aplicarFiltrosMedidores()">
+                    </div>
+                    <div>
+                        <label for="filterZona">Zona:</label>
+                        <select id="filterZona" onchange="aplicarFiltrosMedidores()">
+                            <option value="">Todas las zonas</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!--- tabla de medidores -->
+            <div class="data-table">
+                <div id="loading-medidores" class="loading">
+                    Cargando medidores...
+                </div>
+                <div id="tablaMedidores" style="display: none;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Serial</th>
+                                <th>Ubicación</th>
+                                <th>Usuario</th>
+                                <th>Zona</th>
+                                <th>Estado</th>
+                                <th>Última Lectura</th>
+                                <th>Lecturas Total</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="medidoresBody">
+                            <!-- medidores se cargan aquí -->
+                        </tbody>
+                    </table>
+
+                    <!-- paginación -->
+                    <div class="pagination">
+                        <div>
+                            <span id="infoPaginacion">Mostrando 0 de 0 medidores</span>
+                        </div>
+                        <div>
+                            <button class="btn btn-secondary" id="btnAnterior" onclick="cambiarPagina(-1)">← Anterior</button>
+                            <span style="margin: 0 15px;">Página <span id="paginaActual">1</span></span>
+                            <button class="btn btn-secondary" id="btnSiguiente" onclick="cambiarPagina(1)">Siguiente →</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalNuevoMedidor" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="cerrarModal('modalNuevoMedidor')">&times;</span>
+            <h2>Registrar Nuevo Medidor</h2>
+            <form id="formNuevoMedidor" onsubmit="event.preventDefault(); guardarNuevoMedidor();">
+                <div class="form-group">
+                    <label for="nuevoSerial">Serial:</label>
+                    <input type="text" id="nuevoSerial" required placeholder="Ej: SN-123456">
+                </div>
+                <div class="form-group">
+                    <label for="nuevaUbicacion">Ubicación:</label>
+                    <input type="text" id="nuevaUbicacion" required placeholder="Ej: Casa Principal">
+                </div>
+                <div class="form-group" id="divNuevoUsuario" style="display: none;">
+                    <label for="nuevoUsuarioId">Asignar a Usuario:</label>
+                    <select id="nuevoUsuarioId">
+                        <option value="">Seleccione un usuario...</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="cerrarModal('modalNuevoMedidor')">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Guardar Medidor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalEditarMedidor" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="cerrarModal('modalEditarMedidor')">&times;</span>
+            <h2>Editar Medidor</h2>
+            <form id="formEditarMedidor" onsubmit="event.preventDefault(); guardarEdicionMedidor();">
+                <input type="hidden" id="editMedidorId">
+                <div class="form-group">
+                    <label for="editSerial">Serial:</label>
+                    <input type="text" id="editSerial" required>
+                </div>
+                <div class="form-group">
+                    <label for="editUbicacion">Ubicación:</label>
+                    <input type="text" id="editUbicacion" required>
+                </div>
+                <div class="form-group" id="divEditUsuario" style="display: none;">
+                    <label for="editUsuarioId">Asignar a Usuario:</label>
+                    <select id="editUsuarioId">
+                        <option value="">Seleccione usuario...</option>
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="cerrarModal('modalEditarMedidor')">Cancelar</button>
+                    <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalDetalle" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="cerrarModal('modalDetalle')">&times;</span>
+            <h2>Detalle del Medidor</h2>
+            <div id="detalleContenido">
+                <p><strong>Serial:</strong> <span id="detSerial"></span></p>
+                <p><strong>Ubicación:</strong> <span id="detUbicacion"></span></p>
+                <p><strong>Usuario:</strong> <span id="detUsuario"></span></p>
+                <p><strong>Estado:</strong> <span id="detEstado"></span></p>
+                <hr>
+                <h3>Últimas Lecturas</h3>
+                <table class="mini-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Valor</th>
+                            <th>Obs</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detLecturasBody"></tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="cerrarModal('modalDetalle')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="medidores.js"></script>
+</body>
+</html>

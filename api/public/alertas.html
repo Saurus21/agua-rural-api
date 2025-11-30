@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alertas - Rural Data</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .filters {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .data-table {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        th {
+            background: #34495e;
+            color: white;
+            font-weight: 600;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #ecf0f1;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 2px;
+        }
+        
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+        
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #219a52;
+        }
+        
+        .btn-warning {
+            background: #f39c12;
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            background: #e67e22;
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+        
+        .badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge-resuelta {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-pendiente {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .badge-consumo_alto {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 3px solid #e74c3c;
+        }
+        
+        .badge-variacion_brusca {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 3px solid #f39c12;
+        }
+        
+        .badge-consumo_cero {
+            background: #e2e3e5;
+            color: #383d41;
+            border-left: 3px solid #95a5a6;
+        }
+        
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card-small {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+        
+        .stat-value-small {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .stat-label-small {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+        
+        .alert-priority {
+            width: 4px;
+            height: 100%;
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+        
+        .priority-high {
+            background: #e74c3c;
+        }
+        
+        .priority-medium {
+            background: #f39c12;
+        }
+        
+        .priority-low {
+            background: #3498db;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            overflow: auto;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 25px;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 500px;
+            border-radius: 10px;
+            position: relative;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .close-modal {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .close-modal:hover,
+        .close-modal:focus {
+            color: black;
+            text-decoration: none;
+        }
+
+        .modal-header {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+
+        .modal-body {
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+
+        .modal-divider {
+            border: 0;
+            border-top: 1px solid #eee;
+            margin: 15px 0;
+        }
+
+        .modal-footer {
+            margin-top: 20px;
+            text-align: right;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container" style="max-width: 1400px;">
+        <div class="login-card">
+            <div class="page-header">
+                <div>
+                    <h1>Gestión de Alertas</h1>
+                    <p>Administra y resuelve alertas del sistema</p>
+                </div>
+                <div>
+                    <button class="btn btn-secondary" onclick="goBack()">Volver al Dashboard</button>
+                    <button class="btn btn-primary" onclick="cargarSoloPendientes()">Solo Pendientes</button>
+                </div>
+            </div>
+
+            <!-- estadísticas rápidas -->
+            <div class="stats-cards">
+                <div class="stat-card-small">
+                    <div class="stat-value-small" id="totalAlertas">0</div>
+                    <div class="stat-label-small">Total Alertas</div>
+                </div>
+                <div class="stat-card-small">
+                    <div class="stat-value-small" id="alertasPendientes">0</div>
+                    <div class="stat-label-small">Pendientes</div>
+                </div>
+                <div class="stat-card-small">
+                    <div class="stat-value-small" id="alertasResueltas">0</div>
+                    <div class="stat-label-small">Resueltas</div>
+                </div>
+                <div class="stat-card-small">
+                    <div class="stat-value-small" id="alertasHoy">0</div>
+                    <div class="stat-label-small">Hoy</div>
+                </div>
+            </div>
+
+            <!-- filtros -->
+            <div class="filters">
+                <h3>Filtros de Búsqueda</h3>
+                <div class="filter-grid">
+                    <div>
+                        <label for="filterTipo">Tipo de Alerta:</label>
+                        <select id="filterTipo" onchange="aplicarFiltrosAlertas()">
+                            <option value="">Todos los tipos</option>
+                            <option value="consumo_alto">Consumo Alto</option>
+                            <option value="variacion_brusca">Variación Brusca</option>
+                            <option value="consumo_cero">Consumo Cero</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="filterEstado">Estado:</label>
+                        <select id="filterEstado" onchange="aplicarFiltrosAlertas()">
+                            <option value="">Todos</option>
+                            <option value="false">Pendientes</option>
+                            <option value="true">Resueltas</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="filterFechaInicio">Fecha Inicio:</label>
+                        <input type="date" id="filterFechaInicio" onchange="aplicarFiltrosAlertas()">
+                    </div>
+                    <div>
+                        <label for="filterFechaFin">Fecha Fin:</label>
+                        <input type="date" id="filterFechaFin" onchange="aplicarFiltrosAlertas()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- tabla de alertas -->
+            <div class="data-table">
+                <div id="loadingAlertas" class="loading">
+                    Cargando alertas...
+                </div>
+                <div id="tablaAlertas" style="display: none;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Mensaje</th>
+                                <th>Medidor</th>
+                                <th>Usuario</th>
+                                <th>Fecha</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alertasBody">
+                            <!-- alertas se cargan aquí -->
+                        </tbody>
+                    </table>
+                    
+                    <!-- paginación -->
+                    <div class="pagination">
+                        <div>
+                            <span id="infoPaginacion">Mostrando 0 de 0 alertas</span>
+                        </div>
+                        <div>
+                            <button class="btn btn-secondary" id="btnAnterior" onclick="cambiarPagina(-1)">Anterior</button>
+                            <span style="margin: 0 15px;">Página <span id="paginaActual">1</span></span>
+                            <button class="btn btn-secondary" id="btnSiguiente" onclick="cambiarPagina(1)">Siguiente</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalDetalleAlerta" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="cerrarModal()">&times;</span>
+            <h2 class="modal-header">Detalle de Alerta</h2>
+
+            <div id="detalleContenido" class="modal-body">
+                <p><strong>ID:</strong> <span id="detId"></span></p>
+                <p><strong>Tipo:</strong> <span id="detTipo"></span></p>
+                <p><strong>Mensaje:</strong> <span id="detMensaje"></span></p>
+                <p><strong>Fecha:</strong> <span id="detFecha"></span></p>
+                <p><strong>Estado:</strong> <span id="detEstado"></span></p>
+                
+                <hr class="modal-divider">
+
+                <p><strong>Medidor:</strong> <span id="detMedidor"></span></p>
+                <p><strong>Ubicación:</strong> <span id="detUbicacion"></span></p>
+                <p><strong>Lectura Asociada:</strong> <span id="detLectura"></span></p>
+                <p><strong>Usuario:</strong> <span id="detUsuario"></span></p>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="cerrarModal()">Cerrar</button>
+                <button type="button" class="btn btn-success" id="btnResolverModal" style="display: none;" onclick="resolverAlertaDesdeModal()">Resolver Alerta</button>
+            </div>
+        </div>
+
+    <script src="alertas.js"></script>
+</body>
+</html>

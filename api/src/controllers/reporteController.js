@@ -80,7 +80,7 @@ class ReporteController {
                 LEFT JOIN medidores m ON l.medidor_id = m.medidor_id
                 LEFT JOIN usuarios u ON m.user_id = u.user_id
                 LEFT JOIN zonasrurales z ON u.zona_id = z.zona_id
-                WHERE ${whereConditions.join(' AND')}
+                WHERE ${whereConditions.join(' AND ')}
                 GROUP BY
                     m.medidor_id, m.serial, m.ubicacion,
                     u.user_id, u.nombre,
@@ -154,7 +154,7 @@ class ReporteController {
             }
 
             // si no es admin, filtrar por usuario
-            if (req.user,rol !== 'admin') {
+            if (req.user.rol !== 'admin') {
                 paramCount++;
                 whereConditions.push(`m.user_id = $${paramCount}`);
                 values.push(req.user.userId);
@@ -172,7 +172,7 @@ class ReporteController {
                 LEFT JOIN medidores m ON l.medidor_id = m.medidor_id
                 LEFT JOIN usuarios u ON m.user_id = u.user_id
                 LEFT JOIN zonasrurales z ON u.zona_id = z.zona_id
-                WHERE ${whereConditions.join(' AND')}
+                WHERE ${whereConditions.join(' AND ')}
                 ORDER BY a.fecha DESC
             `;
 
@@ -190,7 +190,7 @@ class ReporteController {
                 }
                 acc[alerta.tipo].total++;
                 if (alerta.resuelta) {
-                    acc[alerta.tipo].resueltass++;
+                    acc[alerta.tipo].resueltas++;
                 } else {
                     acc[alerta.tipo].pendientes++;
                 }
@@ -200,7 +200,7 @@ class ReporteController {
             const resumen = {
                 total_alertas: alertas.length,
                 total_resueltas: alertas.filter(a => a.resuelta).length,
-                total_pendientes: alertas.filter(a => a.resuelta).length,
+                total_pendientes: alertas.filter(a => !a.resuelta).length,
                 estadisticas,
                 periodo: {
                     start_date,
@@ -253,18 +253,22 @@ class ReporteController {
         let csv = headers.join(',') + '\n';
 
         datos.forEach(item => {
+
+            const usuario = item.usuario_nombre ? item.usuario_nombre.replace(/"/g, '""') : '';
+            const zona = item.nombre_zona ? item.nombre_zona.replace(/"/g, '""') : '';
+
             const row = [
                 `"${item.serial}"`,
-                `"${item.ubicacion}"`,
-                `"${item.usuario_nombre}"`,
-                `"${item.nombre_zona}"`,
+                `"${item.ubicacion || ''}"`,
+                `"${usuario}"`,
+                `"${zona}"`,
                 item.total_lecturas,
                 item.consumo_promedio,
                 item.consumo_total,
                 item.consumo_minimo,
                 item.consumo_maximo,
-                `"${item.primera_lectura}"`,
-                `"${item.ultima_lectura}"`
+                `"${new Date(item.primera_lectura).toISOString()}"`,
+                `"${new Date(item.ultima_lectura).toISOString()}"`
             ];
             csv += row.join(',') + '\n';
         });

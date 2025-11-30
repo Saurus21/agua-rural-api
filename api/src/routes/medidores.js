@@ -7,6 +7,7 @@ const { authenticateToken } = require('../middleware/auth');
 router.use(authenticateToken);
 
 router.get('/', medidorController.getMedidores);
+router.get('/resumen', medidorController.getResumen.bind(medidorController));
 router.get('/:id', medidorController.getMedidorById);
 router.post('/', medidorController.createMedidor);
 router.put('/:id', medidorController.updateMedidor);

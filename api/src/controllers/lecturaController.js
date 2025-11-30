@@ -16,77 +16,65 @@ class LecturaController {
 
             const offset = (page - 1) * limit;
 
-            let conditions = {};
-            if (medidor_id) conditions.medidor_id = medidor_id;
-            if (sincronizado !== undefined) conditions.sincronizado = sincronizado === 'true';
+            const allConditions = [];
+            const allValues = [];
 
-            // filtrar por fecha si se proporciona
-            let dateCondition = '';
-            const values = [];
-            let paramCount = 0;
-
-            if (start_date || end_date) {
-                dateCondition = 'AND';
-                if (start_date) {
-                    paramCount++;
-                    dateCondition += `l.fecha >= $${paramCount} `;
-                    values.push(start_date);
-                }
-                if (end_date) {
-                    if (start_date) dateCondition += 'AND';
-                    paramCount++;
-                    dateCondition += `l.fecha <= $${paramCount} `;
-                    values.push(end_date);
-                }
+            if (medidor_id) {
+                allConditions.push(`l.medidor_id = $${allValues.length + 1}`);
+                allValues.push(medidor_id);
+            }
+            if (sincronizado !== undefined) {
+                allConditions.push(`l.sincronizado = $${allValues.length + 1}::boolean`);
+                allValues.push(sincronizado === 'true');
             }
 
-            // sino es admin, solo puede ver lecturas de sus medidores
-            let userCondition = '';
             if (req.user.rol !== 'admin') {
-                paramCount++;
-                userCondition = `AND m.user_id = $${paramCount} `;
-                values.push(req.user.userId);
+                allConditions.push(`m.user_id = $${allValues.length + 1}`);
+                allValues.push(req.user.userId);
             }
+
+            if (start_date) {
+                allConditions.push(`l.fecha >= $${allValues.length + 1}`);
+                allValues.push(start_date);
+            }
+
+            if (end_date) {
+                allConditions.push(`l.fecha <= $${allValues.length + 1}`);
+                allValues.push(end_date);
+            }
+
+            const whereClause = allConditions.length > 0
+                ? 'WHERE ' + allConditions.join(' AND ')
+                : '';
+
+            const currentParamsCount = allValues.length;
+            const limitParamIndex = currentParamsCount + 1;
+            const offsetParamIndex = currentParamsCount + 2;
+
+            const queryValues = [...allValues, parseInt(limit), offset];
 
             const sql = `
-                SELECT l.* , m.serial as medidor_serial, u.nombre as usuario_nombre
+                SELECT l.*, m.serial as medidor_serial, u.nombre as usuario_nombre
                 FROM lecturas l
                 LEFT JOIN medidores m ON l.medidor_id = m.medidor_id
                 LEFT JOIN usuarios u ON m.user_id = u.user_id
-                WHERE 1=1 ${Object.keys(conditions).map((key, idx) => {
-                    paramCount++;
-                    values.push(conditions[key]);
-                    return `AND l.${key} = $${paramCount}`;
-                        
-                }).join(' ')} ${userCondition} ${dateCondition}
+                ${whereClause}
                 ORDER BY l.fecha DESC
-                LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
+                LIMIT $${limitParamIndex} OFFSET $${offsetParamIndex}
             `;
 
-            values.push(parseInt(limit), offset);
-            
-            const result = await Lectura.query(sql, values);
+            const result = await Lectura.query(sql, queryValues);
             const lecturas = result.rows;
 
-            // obtener total para la paginacion
             const countSql = `
-                SELECT COUNT(*)
+                SELECT COUNT(*) AS total
                 FROM lecturas l
                 LEFT JOIN medidores m ON l.medidor_id = m.medidor_id
-                WHERE 1=1 ${Object.keys(conditions).map((key, idx) => {
-                    return `AND l.${key} = $${idx + 1}`;
-                }).join(' ')} ${userCondition} ${dateCondition}
+                ${whereClause}
             `;
 
-            const countValues = [
-                ...Object.values(conditions),
-                ...(req.user.rol !== 'admin' ? [req.user.userId] : []),
-                ...(start_date ? [start_date] : []),
-                ...(end_date ? [end_date] : [])
-            ];
-
-            const countResult = await Lectura.query(countSql, countValues);
-            const total = parseInt(countResult.rows[0].count);
+            const countResult = await Lectura.query(countSql, allValues);
+            const total = parseInt(countResult.rows[0].total);
 
             res.json({
                 lecturas,
@@ -94,12 +82,44 @@ class LecturaController {
                     page: parseInt(page),
                     limit: parseInt(limit),
                     total,
-                    pages: Math.ceil(total / limit)
+                    pages: Math.ceil(total / parseInt(limit))
                 }
             });
 
         } catch (error) {
             console.error('Error obteniendo lecturas:', error);
+            res.status(500).json({ error: 'Error interno del servidor' });
+        }
+    }
+
+    // GET /api/lecturas/:id
+    async getLecturaById(req, res) {
+        try {
+            const { id } = req.params;
+
+            const sql = `
+                SELECT l.*, m.serial as medidor_serial, u.nombre as usuario_nombre, m.user_id as owner_id
+                FROM lecturas l
+                LEFT JOIN medidores m ON l.medidor_id = m.medidor_id
+                LEFT JOIN usuarios u ON m.user_id = u.user_id
+                WHERE l.lectura_id = $1
+            `;
+
+            const result = await Lectura.query(sql, [id]);
+            const lectura = result.rows[0];
+
+            if (!lectura) {
+                return res.status(404).json({ error: 'Lectura no encontrada' });
+            }
+
+            if (req.user.rol !== 'admin' && req.user.userId !== lectura.owner_id) {
+                return res.status(403).json({ error: 'No tienes permisos para ver esta lectura' });
+            }
+
+            res.json(lectura);
+
+        } catch (error) {
+            console.error('Error obteniendo lectura por ID:', error);
             res.status(500).json({ error: 'Error interno del servidor' });
         }
     }
@@ -177,23 +197,26 @@ class LecturaController {
                 if (promedioAnterior > 10) {
                     alertas.push({
                         lectura_id: lectura.lectura_id,
-                        tipo: 'consumo__cero',
+                        tipo: 'consumo_cero',
                         mensaje: 'Consumo cero detectado - posible falla en el medidor'
                     });
                 }
             }
 
             // alerta por variacion brusca > 50% del promedio
-            if (lecturasAnteriores >= 3) {
+            if (lecturasAnteriores.length >= 3) {
                 const promedio = lecturasAnteriores.reduce((sum, l) => sum + l.valor, 0) / lecturasAnteriores.length;
-                const variacion = Math.abs((lectura.valor - promedio) / promedio);
 
-                if (variacion > 0.5) {
-                    alertas.push({
-                        lectura_id: lectura.lectura_id,
-                        tipo: 'variacion_brusca',
-                        mensaje: `Variación del ${Math.round(variacion * 100)}% detectada`
-                    });
+                if (promedio > 0) {
+                    const variacion = Math.abs((lectura.valor - promedio) / promedio);
+
+                    if (variacion > 0.5) {
+                        alertas.push({
+                            lectura_id: lectura.lectura_id,
+                            tipo: 'variacion_brusca',
+                            mensaje: `Variación del ${Math.round(variacion * 100)}% detectada`
+                        });
+                    }   
                 }
             }
 

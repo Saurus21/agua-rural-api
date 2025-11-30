@@ -1,5 +1,5 @@
 const { parse } = require('dotenv');
-const { Medidor, User, Lectura } = require('../models');
+const { Medidor, User, Lectura, ZonaRural } = require('../models');
 const { idColumn } = require('../models/User');
 const { compare } = require('bcryptjs');
 
@@ -12,13 +12,13 @@ class MedidorController {
             const offset = (page - 1) * limit;
 
             let conditions = {};
-            if (user_id) conditions.userId = user_id;
+            if (user_id) conditions.user_id = user_id;
             if (activo !== undefined) conditions.activo = activo === 'true';
-            if (serial) conditions.serialNumber = { $like: `%${serial}%` };
+            if (serial) conditions.serial = { $like: `%${serial}%` };
 
             // si no es admin, solo ver sus propios medidores
-            if (req.user.role !== 'admin' && !user_id) {
-                conditions.userId = req.user.id;
+            if (req.user.rol !== 'admin' && !user_id) {
+                conditions.user_id = req.user.userId;
             }
 
             const medidores = await Medidor.findAll(conditions, parseInt(limit), offset);
@@ -28,25 +28,54 @@ class MedidorController {
             const medidoresWithUser = await Promise.all(
                 medidores.map(async (medidor) => {
                     let userInfo = null;
-                    if (medidor.userId) {
-                        userInfo = await User.findById(medidor.userId);
-                        // no enviar informacion sensible
-                        if (userInfo) {
-                            userInfo = {
-                                user_id: userInfo.user_id,
-                                nombre: userInfo.nombre,
-                                email: userInfo.email
-                            };
-                        }
-                    }
+                    let userObj = null;
 
+                    try {
+                        const userIdRef = medidor.user_id || medidor.userId;
+                        if (userIdRef) {
+                            userObj = await User.findById(userIdRef);
+
+                            if (userObj) {
+                                let zonaInfo = null;
+
+                                if (typeof ZonaRural !== 'undefined' && userObj.zona_id) {
+                                    try {
+                                        const zona = await ZonaRural.findById(userObj.zona_id);
+                                        if (zona) {
+                                            zonaInfo = {
+                                                zona_id: zona.zona_id,
+                                                nombre_zona: zona.nombre_zona,
+                                            };
+                                        }
+                                    } catch (e) {
+                                        console.warn('No se pudo cargar la zona:', e.message);
+                                    }
+                                }
+
+                                userInfo = {
+                                    user_id: userObj.user_id,
+                                    nombre: userObj.nombre,
+                                    email: userObj.email,
+                                    zona: zonaInfo
+                                };
+                            }
+                        }
+
+                    } catch (error) {
+                        console.error(`Error cargando usuario para medidor ${medidor.medidor_id}:`, error.message);                   
+                    }
+                    
                     // obtener ultima lectura
                     const ultimaLectura = await Lectura.getUltimaLectura(medidor.medidor_id);
+
+                    // obtener total de lecturas
+                    const totalLecturas = await Lectura.count({ medidor_id: medidor.medidor_id });
 
                     return {
                         ...medidor,
                         usuario: userInfo,
-                        ultima_lectura: ultimaLectura
+                        ultima_lectura: ultimaLectura,
+                        total_lecturas_conteo: parseInt(totalLecturas)
                     };
                 })
             );
@@ -78,7 +107,7 @@ class MedidorController {
             }
 
             // verificar permisos (admin o propietario)
-            if (req.user.role !== 'admin' && req.user.userId !== medidor.userId) {
+            if (req.user.rol !== 'admin' && req.user.userId !== medidor.user_id) {
                 return res.status(403).json({ error: 'No tienes permisos para acceder a este medidor' });
             }
 
@@ -129,9 +158,9 @@ class MedidorController {
 
             // determinar user_id
             let assignedUserId = user_id;
-            if (req.user.role !== 'admin') {
+            if (req.user.rol !== 'admin') {
                 // lectores solo pueden asignarse a si mismos
-                assignedUserId = req.user.id;
+                assignedUserId = req.user.userId;
             }
 
             // verificar que el usuario asignado exista
@@ -173,19 +202,33 @@ class MedidorController {
             }
 
             // verificar permisos (admin o propietario)
-            if (req.user.role !== 'admin' && req.user.userId !== medidor.userId) {
+            if (req.user.rol !== 'admin' && String(req.user.userId) !== String(medidor.user_id)) {
                 return res.status(403).json({ error: 'No tienes permisos para actualizar este medidor' });
             }
 
-            const { serial, ubicacion, user_id } = req.body;
+            const { serial, ubicacion, user_id, activo } = req.body;
 
             const updateData = {};
             if (serial) updateData.serial = serial;
             if (ubicacion) updateData.ubicacion = ubicacion;
 
+            // permitir cambiar estado
+            if (activo !== undefined) {
+                updateData.activo = activo;
+            }
+
             // solo admin puede cambiar el usuario asignado
             if (req.user.rol === 'admin' && user_id !== undefined) {
                 updateData.user_id = user_id;
+            }
+
+            console.log('DATOS PROCESADOS PARA UPDATE:', updateData);
+
+            if (Object.keys(updateData).length === 0) {
+                return res.status(400).json({ 
+                    error: 'No se enviaron datos válidos para actualizar.',
+                    recibido: req.body 
+                });
             }
 
             const updatedMedidor = await Medidor.update(id, updateData);
@@ -262,6 +305,35 @@ class MedidorController {
         } catch (error) {
             console.error('Error obteniendo lecturas del medidor:', error);
             res.status(500).json({ error: 'Error interno del servidor' }); 
+        }
+    }
+
+    // GET api/medidores/resumen - estadísticas para dashboard
+    async getResumen(req, res) {
+        try {
+            const total = await Medidor.count({});
+            const activos = await Medidor.count({ activo: true });
+            const inactivos = await Medidor.count({ activo: false });
+
+            const ultimaLecturaResult = await Lectura.query(
+                'SELECT fecha FROM lecturas ORDER BY fecha DESC LIMIT 1',
+                []
+            );
+
+            const ultimaFecha = ultimaLecturaResult.rows.length > 0
+                ? ultimaLecturaResult.rows[0].fecha
+                : null;
+
+            res.json({
+                total_medidores: parseInt(total),
+                medidores_activos: parseInt(activos),
+                medidores_inactivos: parseInt(inactivos),
+                ultima_lectura_fecha: ultimaFecha
+            });
+
+        } catch (error) {
+            console.error('Error obteniendo resumen de medidores:', error);
+            res.status(500).json({ error: 'Error interno del servidor' });
         }
     }
 }

@@ -16,72 +16,60 @@ class AlertaController {
 
             const offset = (page - 1) * limit;
 
-            let conditions = {};
-            if (tipo) conditions.tipo = tipo;
-            if (resuelta !== undefined) conditions.resuelta = resuelta === 'true';
+            let whereClause = 'WHERE 1=1';
+            const values = [];
+            let paramCount = 0;
 
-            // si se piden solo pendientes
-            if (pendientes === 'true') {
-                conditions.resuelta = false;
+            if (tipo) {
+                paramCount++;
+                whereClause += ` AND a.tipo = $${paramCount}`;
+                values.push(tipo);
             }
-            
-            let sql = `
+
+            if (resuelta !== undefined) {
+                paramCount++;
+                whereClause += ` AND a.resuelta = $${paramCount}::boolean`;
+                values.push(resuelta === 'true');
+            }
+
+            if (pendientes === 'true') {
+                paramCount++;
+                whereClause += ` AND a.resuelta = $${paramCount}::boolean`;
+                values.push(false);
+            }
+
+            if (req.user.rol !== 'admin') {
+                paramCount++;
+                whereClause += ` AND m.user_id = $${paramCount}`;
+                values.push(req.user.userId);
+            }
+
+            const sql = `
                 SELECT a.*, l.valor as lectura_valor, m.serial as medidor_serial,
                     u.nombre as usuario_nombre, u.user_id as usuario_id
                 FROM alertas a
                 LEFT JOIN lecturas l ON a.lectura_id = l.lectura_id
                 LEFT JOIN medidores m ON l.medidor_id = m.medidor_id
                 LEFT JOIN usuarios u ON m.user_id = u.user_id
-                WHERE 1=1
+                ${whereClause}
+                ORDER BY a.fecha DESC
+                LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}
             `;
 
-            const values = [];
-            let paramCount = 0;
-
-            // aplicar condiciones
-            for (const [key, value] of Object.entries(conditions)) {
-                paramCount++;
-                sql += ` AND m.user_id = $${paramCount}`;
-                values.push(req.user.userId);
-            }
-
-            // sino es admin, solo puede ver alertas de sus medidores
-            if (req.user.rol !== 'admin') {
-                paramCount++;
-                sql += ` AND m.user_id = $${paramCount}`;
-                values.push(req.user.userId);
-            }
-
-            sql += ` ORDER BY a.fecha DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
-            values.push(parseInt(limit), offset);
-
-            const result = await Alerta.query(sql, values);
+            const queryValues = [...values, parseInt(limit), offset];
+            const result = await Alerta.query(sql, queryValues);
             const alertas = result.rows;
 
-            // obtener total
-            let countSql =  `
-                SELECT COUNT (*)
+            const countSql = `
+                SELECT COUNT(*) as total
                 FROM alertas a
                 LEFT JOIN lecturas l ON a.lectura_id = l.lectura_id
                 LEFT JOIN medidores m ON l.medidor_id = m.medidor_id
-                WHERE 1=1
+                ${whereClause}
             `;
 
-            const countValues = [...Object.values(conditions)];
-            let countParamCount = countValues.length;
-
-            for (const [key, value] of Object.entries(conditions)) {
-                countSql += ` AND a.${key} = $${countValues.indexOf(value) + 1}`;
-            }
-
-            if (req.user.rol !== 'admin') {
-                countParamCount++;
-                countSql += ` AND m.user_id = $${countParamCount}`;
-                countValues.push(req.user.userId);
-            }
-
-            const countResult = await Alerta.query(countSql, countValues);
-            const total = parseInt(countResult.rows[0].count);
+            const countResult = await Alerta.query(countSql, values);
+            const total = parseInt(countResult.rows[0].total);
 
             res.json({
                 alertas,
@@ -89,7 +77,7 @@ class AlertaController {
                     page: parseInt(page),
                     limit: parseInt(limit),
                     total,
-                    pages: Math.ceil(total / limit)
+                    pages: Math.ceil(total / parseInt(limit))
                 }
             });
 
@@ -98,6 +86,43 @@ class AlertaController {
             res.status(500).json({ error: 'Error interno del servidor' });
         }
     }
+
+    // GET /api/alertas/:id
+    async getAlertaById(req, res) {
+        try {
+            const { id } = req.params;
+
+            const sql = `
+                SELECT a.*,
+                    l.valor as lectura_valor, l.fecha as lectura_fecha,
+                    m.serial as medidor_serial, m.ubicacion as medidor_ubicacion,
+                    u.nombre as usuario_nombre, u.email as usuario_email, u.user_id as owner_id
+                FROM alertas a
+                LEFT JOIN lecturas l ON a.lectura_id = l.lectura_id
+                LEFT JOIN medidores m ON l.medidor_id = m.medidor_id
+                LEFT JOIN usuarios u ON m.user_id = u.user_id
+                WHERE a.alerta_id = $1
+            `;
+
+            const result = await Alerta.query(sql, [id]);
+            const alerta = result.rows[0];
+
+            if (!alerta) {
+                return res.status(404).json({ error: 'Alerta no encontrada' });
+            }
+
+            if (req.user.rol !== 'admin' && alerta.owner_id !== req.user.userId) {
+                return res.status(403).json({ error: 'No tienes permiso para ver esta alerta' });
+            }
+
+            res.json(alerta);
+
+        } catch (error) {
+            console.error('Error obteniendo alerta por ID:', error);
+            res.status(500).json({ error: 'Error interno del servidor' });
+        }
+    }
+
 
     // GET /api/alertas/estadisticas
     async getEstadisticasAlertas(req, res) {
@@ -158,26 +183,23 @@ class AlertaController {
         try {
             const { id } = req.params;
 
-            const alerta = await Alerta.findById(id);
-            if (!alerta) {
-                res.status(404).json({ error: 'Alerta no encontrada' });
+            const sqlCheck = `
+                SELECT a.*, m.user_id as owner_id
+                FROM alertas a
+                LEFT JOIN lecturas l ON a.lectura_id = l.lectura_id
+                LEFT JOIN medidores m ON l.medidor_id = m.medidor_id
+                WHERE a.alerta_id = $1
+            `;
+
+            const checkResult = await Alerta.query(sqlCheck, [id]);
+
+            if (checkResult.rows.length === 0) {
+                return res.status(404).json({ error: 'Alerta no encontrada' });
             }
 
-            // verificar permisos
-            if (req.user.rol !== 'admin') {
-                // obtener informacion de la lectura y medidor para verificar permisos
-                const sql = `
-                    SELECT m.user_id
-                    FROM alertas a
-                    LEFT JOIN lecturas l ON a.lectura_id = l.lectura_id
-                    LEFT JOIN medidores m ON l.medidor_id = m.medidor_id
-                    WHERE a.alerta_id = $1
-                `;
-                const result = await Alerta.query(sql, [id]);
-
-                if (result.rows.length === 0 || result.rows[0].user_id !== req.user.userId) {
-                    return res.status(403).json({ error: 'No tienes permiso para resolver esta alerta' });
-                }
+            const alerta = checkResult.rows[0];
+            if (req.user.rol !== 'admin' && alerta.owner_id !== req.user.userId) {
+                return res.status(403).json({ error: 'No tienes permiso para resolver esta alerta' });
             }
 
             const alertaResuelta = await Alerta.marcarComoResuelta(id);

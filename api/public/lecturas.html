@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lecturas - Rural Data</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .filters {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .data-table {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        th {
+            background: #34495e;
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #ecf0f1;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-sincronizado {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-pendiente {
+            background: #fff3cd;
+            color: #155724;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            overflow: auto;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 25px;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 500px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .close-modal {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close-modal:hover,
+        .close-modal:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .modal-footer {
+            text-align: right;
+            margin-top: 20px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .detail-row {
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        .detail-label {
+            font-weight: bold;
+            color: #555;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="login-container" style="max-width: 1200px;">
+        <div class="login-card">
+            <div class="page-header">
+                <div>
+                    <h1>Todas las Lecturas</h1>
+                    <p>Gestión completa de lecturas de medidores</p>
+                </div>
+                <div>
+                    <button class="btn btn-secondary" onclick="goBack()">Volver al Dashboard</button>
+                    <button class="btn btn-primary" onclick="abrirModalNuevaLectura()">Nueva Lectura</button>
+                </div>
+            </div>
+
+            <div class="message hidden">
+                <div id="apiResponse"></div>
+            </div>
+
+            <!-- filtros -->
+            <div class="filters">
+                <h3>Filtros de Búsqueda</h3>
+                <div class="filter-grid">
+                    <div>
+                        <label for="filterMedidor">Medidor:</label>
+                        <select id="filterMedidor" onchange="aplicarFiltrosLecturas()">
+                            <option value="">Todos los medidores</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="filterFechaInicio">Fecha Inicio:</label>
+                        <input type="date" id="filterFechaInicio" onchange="aplicarFiltrosLecturas()">
+                    </div>
+                    <div>
+                        <label for="filterFechaFin">Fecha Fin:</label>
+                        <input type="date" id="filterFechaFin" onchange="aplicarFiltrosLecturas()">
+                    </div>
+                    <div>
+                        <label for="filterSincronizado">Estado:</label>
+                        <select id="filterSincronizado" onchange="aplicarFiltrosLecturas()">
+                            <option value="">Todos</option>
+                            <option value="true">Sincronizado</option>
+                            <option value="false">Pendiente</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- tabla de lecturas -->
+            <div class="data-table">
+                <div id="loadingLecturas" class="loading">
+                    Cargando lecturas...
+                </div>
+                <div id="tablaLecturas" style="display: none;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Medidor</th>
+                                <th>Valor</th>
+                                <th>Usuario</th>
+                                <th>Observación</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lecturasBody">
+                            <!-- lecturas se cargan aqui -->
+                        </tbody>
+                    </table>
+
+                    <!-- paginación -->
+                    <div class="pagination">
+                        <div>
+                            <span id="infoPaginacion">Mostrando 0 de 0 lecturas</span>
+                        </div>
+                        <div>
+                            <button class="btn btn-secondary" id="btnAnterior" onclick="cambiarPagina(-1)">Anterior</button>
+                            <span style="margin: 0 15px;">Página <span id="paginaActual">1</span></span>
+                            <button class="btn btn-secondary" id="btnSiguiente" onclick="cambiarPagina(1)">Siguiente</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalNuevaLectura" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="cerrarModal('modalNuevaLectura')">&times;</span>
+            <h2>Registrar Nueva Lectura</h2>
+            <form id="formNuevaLectura" onsubmit="event.preventDefault(); guardarLectura();">
+                <div class="form-group">
+                    <label for="nuevoMedidorId">Seleccionar Medidor:</label>
+                    <select id="nuevoMedidorId" required>
+                        <option value="">Cargando medidores...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="nuevoValor">Valor de Lectura (kWh):</label>
+                    <input type="number" id="nuevoValor" step="0.01" min="0" required placeholder="Ej: 1540.5">
+                </div>
+                <div class="form-group">
+                    <label for="nuevaObservacion">Observación (Opcional):</label>
+                    <textarea id="nuevaObservacion" rows="3" placeholder="Ej: Medidor con polvo, difícil acceso"></textarea>
+                </div>
+                <input type="hidden" id="latitud">
+                <input type="hidden" id="longitud">
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="cerrarModal('modalNuevaLectura')">Cancelar</button>
+                    <button type="submit" class="btn btn-success">Guardar Lectura</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalDetalle" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="cerrarModal('modalDetalle')">&times;</span>
+            <h2>Detalle de Lectura</h2>
+            <div id="contenidoDetalle">
+                <div class="detail-row"><span class="detail-label">ID:</span> <span id="detId"></span></div>
+                <div class="detail-row"><span class="detail-label">Fecha:</span> <span id="detFecha"></span></div>
+                <div class="detail-row"><span class="detail-label">Medidor:</span> <span id="detMedidor"></span></div>
+                <div class="detail-row"><span class="detail-label">Valor:</span> <span id="detValor"></span></div>
+                <div class="detail-row"><span class="detail-label">Usuario:</span> <span id="detUsuario"></span></div>
+                <div class="detail-row"><span class="detail-label">Estado:</span> <span id="detEstado"></span></div>
+                <div class="detail-row">
+                    <span class="detail-label">Observación:</span> 
+                    <p id="detObs" style="margin-top: 5px; background: #f9f9f9; padding: 10px; border-radius: 4px;"></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="cerrarModal('modalDetalle')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="lecturas.js"></script>
+</body>
+</html>
