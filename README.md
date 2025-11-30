@@ -5,12 +5,9 @@ API para el sistema de recolección de datos de medidores de agua en zonas rural
 ## Descripción del proyecto
 
 Esta API forma parte del proyecto de titulación "Plataforma de Recolección de Datos de Medidores de Agua en Zonas Rurales". Proporciona los endpoints necesarios para:
-- Gestión de lecturas de medidores de agua
-
-TODO:
-- Sincronización de datos desde aplicaciones móviles
-- Generación de reportes y alertas
-- Administración de usuarios y zonas rurales
+- Gestión de lecturas, medidores y usuarios
+- Sincronización con dispostivos móviles
+- Creación de Reportes y Alertas
 
 ## Tecnologías Utilizadas
 
